@@ -39,6 +39,8 @@ services:
         uv run manage.py collectstatic --noinput
         uv run manage.py runserver 0.0.0.0:8000
     environment:
+      DEFAULT_SUPERUSER_EMAIL: "admin@hydroserver.org"
+      DEFAULT_SUPERUSER_PASSWORD: "pass"
       SERVER_ENVIRONMENT: "Development"
       DATABASE_URL: "postgresql://admin:pass@postgresql:5432/hydroserver"  # A connection to the PostgreSQL or TimescaleDB server HydroServer will use.
       # Deployment Settings
