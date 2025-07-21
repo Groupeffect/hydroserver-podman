@@ -1,0 +1,46 @@
+# prepare stack folder 
+services:
+  x-gitclonerservice: &gitcloner
+    image: docker.io/alpine/git:latest 
+    working_dir: /stack
+    volumes:
+      - ./stack:/stack
+
+  x-manager: &manager
+    image: docker.io/python:alpine3.22 
+    working_dir: /stack 
+    volumes:
+      - ./stack:/stack
+
+  clone_hydroserver_api_service: 
+    <<: *gitcloner
+    command: clone --branch v1.2.0  https://github.com/hydroserver2/hydroserver-api-services.git
+
+  clone_hydroserver_data_management: 
+    <<: *gitcloner
+    command: clone --branch v1.2.0  https://github.com/hydroserver2/hydroserver-data-management-app.git
+
+  clone_hydroserver_ops: 
+    <<: *gitcloner
+    command: clone --branch v1.2.0  https://github.com/hydroserver2/hydroserver-ops.git
+
+  manage_files:
+    <<: *manager
+    depends_on:
+      clone_hydroserver_ops:
+        condition: service_completed_successfully
+    command:
+      - /bin/sh
+      - -c
+      - |
+        python -c "
+        with open('hydroserver-ops/docker/hydroserver-local-template.yml','r') as f: 
+          string = f.read().replace('{hydroserver-api-services}','./hydroserver-api-services')
+          string = string.replace('{hydroserver-data-management-app}','./hydroserver-data-management-app')
+          string = string.replace('- ./nginx/nginx.conf:/etc/nginx/nginx.conf','- ./hydroserver-ops/docker/nginx/nginx.conf:/etc/nginx/nginx.conf')
+          # string = string.replace('django:','x-django: &django')
+          f.close()
+          print(string)
+        with open('/stack/hydroserver-local-template.yml','w') as f:
+          f.write(string)
+        "
