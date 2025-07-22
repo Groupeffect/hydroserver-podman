@@ -1,40 +1,30 @@
 # hydroserver-1.2
 
-Easy Local Deployment with Podman 
-
-### simple setup and start script
+Easy Local Deployment with Podman  with simple setup and start script
 
 cli command: 
 
-`
-. start.sh
-`
+`. start.sh`
 
-### Setup
+**Setup**
 
-`
-podman compose -f setup-compose.yaml up
-`
+`podman compose -f setup-compose.yaml up`
 
-### Run Podman
+**Run Podman**
 
-`
-podman compose up
-`
+`podman compose up`
 
-### After container startup
+**After container startup go to:**
 
-**go to:**
-
-**frontend nginx:**
+frontend nginx:
 
 - http://localhost:3030/Login
 
-**test frontend:**
+test frontend:
 
 - http://localhost:5173/login?next=/sites
 
-**django admin:**
+django admin:
 
 - http://localhost:8000/admin/
 
