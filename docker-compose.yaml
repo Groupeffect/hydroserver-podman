@@ -1,12 +1,88 @@
-services:
-  x-uv: &pyuv
-    build:
-      context: "."
-      dockerfile: Dockerfile.pyuv
+x-uv: &pyuv
+  restart: unless-stopped
+  build:
+    context: "."
+    dockerfile: Dockerfile.pyuv
 
-  postgresql:
+x-standard: &standard
+  restart: unless-stopped
+  image: python:3.11
+
+x-standardcommand: &standardcommand
+  command:
+    - sh
+    - -c
+    - |
+      python -m venv .venv
+      source .venv/bin/activate
+      pip install -r requirements.txt
+      python manage.py migrate
+      python manage.py load_etl_test_data
+      python manage.py load_sta_test_data
+      python manage.py load_sta_test_observations 10
+      python manage.py collectstatic --noinput
+      python manage.py runserver 0.0.0.0:8000
+
+x-debugcommand: &debugcommand
+  command:
+    - sh
+    - -c
+    - |
+      source .venv/bin/activate
+      pip install -r requirements.txt
+      python manage.py migrate
+      python manage.py configure_timescaledb
+      python manage.py collectstatic --noinput
+      # python manage.py runserver 0.0.0.0:8000
+      # python -m http.server 8000
+      python -m debugpy --listen 0.0.0.0:8001 --wait-for-client manage.py runserver 0.0.0.0:8000
+
+x-uvdebugcommand: &uvdebugcommand
+  command:
+    - sh
+    - -c
+    - |
+      cd /
+      uv init app
+      uv python install 3.11
+      uv python pin 3.11
+      uv add debugpy
+      cd /app 
+      uv add -r requirements.txt
+      uv python pin 3.11
+      python -m http.server 8002
+      # uv run manage.py makemigrations
+      # uv run manage.py migrate
+      # uv run manage.py load_etl_test_data
+      # uv run manage.py load_sta_test_data
+      # uv run manage.py load_sta_test_observations 10
+      # uv run manage.py collectstatic --noinput
+      # uv run -m debugpy --listen 0.0.0.0:8001 --wait-for-client manage.py runserver 0.0.0.0:8000
+
+x-uvruncommand: &uvruncommand
+  command:
+    - sh
+    - -c
+    - |
+      cd /
+      uv init app
+      uv python install 3.11
+      uv python pin 3.11
+      cd /app 
+      uv add -r requirements.txt
+      uv run manage.py makemigrations
+      uv run manage.py migrate
+      # uv run manage.py load_etl_test_data
+      # uv run manage.py load_sta_test_data
+      uv run manage.py load_sta_test_observations 10
+      uv run manage.py collectstatic --noinput
+      uv run manage.py runserver 0.0.0.0:8000
+
+services:
+  hs_postgresql:
+    restart: unless-stopped
     image: docker.io/postgres:17
-    container_name: postgresql
+    container_name: hs_postgresql
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: pass
@@ -16,36 +92,28 @@ services:
     volumes:
       - hydroserver_dev_data:/var/lib/postgresql/data
 
-  django:
-    <<: *pyuv
+  hs_django:
+    <<: *standard
+    <<: *standardcommand
+    container_name: hs_django
     restart: unless-stopped
     ports:
-      - 127.0.0.1:8000:8000
+      - 8000:8000
+      - 8001:8001 # debug ports
+      - 8002:8002 # debug ports
     volumes:
       - ./stack/hydroserver-api-services:/app
       - staticfiles:/app/staticfiles
+      - mediafiles:/app/mediafiles
     working_dir: /app
-    command:
-      - sh
-      - -c
-      - |
-        cd /
-        uv init app
-        cd /app 
-        uv add -r requirements.txt
-        uv run manage.py makemigrations
-        uv run manage.py migrate
-        uv run manage.py configure_timescaledb
-        uv run manage.py collectstatic --noinput
-        uv run manage.py runserver 0.0.0.0:8000
     environment:
-      DEFAULT_SUPERUSER_EMAIL: "admin@hydroserver.org"
+      DEFAULT_SUPERUSER_EMAIL: "mail@groupeffect.de"
       DEFAULT_SUPERUSER_PASSWORD: "pass"
       SERVER_ENVIRONMENT: "Development"
-      DATABASE_URL: "postgresql://admin:pass@postgresql:5432/hydroserver"  # A connection to the PostgreSQL or TimescaleDB server HydroServer will use.
+      DATABASE_URL: "postgresql://admin:pass@hs_postgresql:5432/hydroserver"  # A connection to the PostgreSQL or TimescaleDB server HydroServer will use.
+      ALLOWED_HOSTS: "*"              # Defaults to the host of PROXY_BASE_URL.
       # Deployment Settings
       # PROXY_BASE_URL: ""             # The base URL HydroServer will be served from.
-      # ALLOWED_HOSTS: ""              # Defaults to the host of PROXY_BASE_URL.
       # DEBUG: ""                      # True/False: This should be set to False in production environments.
       # DEPLOYMENT_BACKEND: ""         # Use 'aws' or 'gcp' for cloud deployments, otherwise use 'local'.
       # SECRET_KEY: ""                 # This is required by Django. Keep this value secret.
@@ -74,7 +142,11 @@ services:
         condition: service_started
 
 
-  nodejs:
+  hs_nodejs:
+    environment:
+      VITE_APP_PROXY_BASE_URL: "" # must be set to empty string
+    restart: unless-stopped
+    container_name: hs_nodejs
     image: node:latest
     working_dir: /app
     ports:
@@ -88,21 +160,25 @@ services:
         npm install
         npm run docker-dev
 
-  nginx:
+  hs_nginx:
+    restart: unless-stopped
+    container_name: hs_nginx
     image: nginx:latest
     links:
-      - nodejs
-      - django
+      - hs_nodejs
+      - hs_django
     volumes:
-      - ./stack/hydroserver-ops/docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx.conf:/etc/nginx/nginx.conf
       - staticfiles:/staticfiles
+      - mediafiles:/mediafiles
     ports:
-      - "3030:80"
+      - "8080:8080"
     depends_on:
-      django: 
+      hs_django: 
         condition: service_started
-      nodejs: 
+      hs_nodejs: 
         condition: service_started
 volumes:
   hydroserver_dev_data:
   staticfiles:
+  mediafiles:

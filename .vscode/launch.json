@@ -1,0 +1,28 @@
+{
+    "configurations": [
+        {
+            "name": "Debugpy Podman",
+            "type": "debugpy",
+            "request": "attach",
+            "django": true,
+            "justMyCode": true,
+            "connect": {
+                "host": "localhost",
+                "port": 8001
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}/stack/hydroserver-api-services", // Maps C:\Users\user1\project1
+                    "remoteRoot": "/app", // To current working directory ~/project1
+                }
+            ],
+            "rules": [
+                {
+                "path": "${workspaceFolder}/stack/hydroserver-api-services/manage.py",
+                "include": false
+                }
+            ]
+        }
+    ],
+    "version": "0.2.0"
+}
