@@ -18,7 +18,7 @@ cli command:
 
 frontend nginx:
 
-- http://localhost:3030/Login
+- http://localhost:8080/Login
 
 test frontend:
 
