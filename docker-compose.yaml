@@ -138,7 +138,7 @@ services:
       # AWS_CLOUDFRONT_KEY_ID: "" # The ID of the AWS CloudFront key used to generate signed photo URLs.
       # GS_PROJECT_ID: ""         # The ID of the GCP project HydroServer is deployed to.
     depends_on:
-      postgresql:
+      hs_postgresql:
         condition: service_started
 
 
